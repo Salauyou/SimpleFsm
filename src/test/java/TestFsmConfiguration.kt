@@ -15,10 +15,15 @@ class TestFsmConfiguration {
         val logger = LoggerFactory.getLogger("test")
     }
 
-    val fakeConsumer = Consumer<Context, Event> { _, _, -> }
+    val valueLoggingConsumer = Consumer<Context, MyEvent> { _, e ->
+        logger.info("Value is ${e.count}")
+    }
     val successFilter = Filter<Context, Event> { _, _, -> TransitionResult.SUCCESS }
     val failingFilter = Filter<Context, Event> { _, _, -> TransitionResult.failed("D-oh!") }
-    val throwingConsumer = Consumer<Context, Event> { _, _, -> throw IllegalArgumentException() }
+    val throwingConsumer = Consumer<Context, Event> { _, _, ->
+        throw IllegalArgumentException("Ugh!")
+    }
+
     val valueExtractor: (MyEvent) -> Int = { it.count }
 
     @Test
@@ -26,42 +31,43 @@ class TestFsmConfiguration {
         val builder = FsmBuilderImpl<Context, Event, State>()
 
         builder.transition(State.DRAFT, MyEvent::class.java, State.WAITING) {
-            consume(fakeConsumer)
+            consumer(valueLoggingConsumer)
             filter(successFilter)
-            route(valueExtractor) {
+            router(valueExtractor) {
                 whenever(1) {
-                    consume(LoggingConsumer("Value is 1"))
-                    consume(LoggingConsumer("Draft"))
+                    consumer(LoggingConsumer("Draft"))
                     setState(State.DRAFT)
                 }
                 whenever(2) {
-                    consume(LoggingConsumer("Value is 2"))
-                    consume(LoggingConsumer("Pending"))
+                    consumer(LoggingConsumer("Pending"))
                     setState(State.PENDING)
                 }
                 whenever(3) {
-                    consume(LoggingConsumer("Value is 3"))
                     filter(failingFilter)
-                    consume(LoggingConsumer("This should not be printed"))
+                    consumer(LoggingConsumer("This should not be printed"))
+                }
+                whenever(4) {
+                    consumer(throwingConsumer)
+                    consumer(LoggingConsumer("This shoud not be printed"))
                 }
                 otherwise {
                     filter(CountingFilter(5))
-                    route(valueExtractor) {
+                    router(valueExtractor) {
                         whenever(8, 9, 10) {
-                            consume(LoggingConsumer("Booked"))
+                            consumer(LoggingConsumer("Finished"))
                             setState(State.FINISHED)
                         }
                         otherwise {
-                            consume(LoggingConsumer("Placed"))
+                            consumer(LoggingConsumer("Waiting"))
                         }
                     }
                 }
             }
-            consume(LoggingConsumer("Router passed"))
+            consumer(LoggingConsumer("Router passed"))
         }.ifFailed {
-            consume(throwingConsumer)
+            consumer(throwingConsumer)
         }.ifFailed {
-            consume(LoggingConsumer("Failed"))
+            consumer(LoggingConsumer("Failed"))
         }
 
         for (i in 1..10) {
@@ -70,9 +76,8 @@ class TestFsmConfiguration {
                 init(Context(), State.DRAFT)
             }.run {
                 invoke(MyCountedEvent(i)).let {
-                    logger.info("Message: " + it.msg)
+                    logger.info("Result: [$it], state: [${getState()}]")
                 }
-                logger.info("State: " + getState())
             }
         }
     }

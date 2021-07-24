@@ -46,12 +46,12 @@ private class ExecutionImpl<C:Any, E:Any, S:Any>(
     var manualState: S? = null
 
     override fun filter(filter: Filter<in C, in E>) {
-        filter.filter(context, event).takeIf { !it.success() }?.let {
+        filter.filter(context, event).takeIf { !it.isSuccess() }?.let {
             throw FailedTransitionException(it)
         }
     }
 
-    override fun consume(consumer: Consumer<in C, in E>) {
+    override fun consumer(consumer: Consumer<in C, in E>) {
         consumer.consume(context, event, result)
     }
 
@@ -63,7 +63,7 @@ private class ExecutionImpl<C:Any, E:Any, S:Any>(
         manualState = state
     }
 
-    override fun <V> route(router: (E) -> V, executions: RouteExecution<C, E, S, V>.() -> Unit) {
+    override fun <V> router(router: (E) -> V, executions: RouteExecution<C, E, S, V>.() -> Unit) {
         RouteExecutionImpl(this, router.invoke(event)).let {
             executions.invoke(it)
         }
@@ -120,7 +120,7 @@ private open class TransitionImpl<C:Any, E:Any, S:Any>(
         val parent = ref.get()
         object: TransitionImpl<C, E, S>(ref, parent.sourceState) {
             override fun execute(exec: ExecutionImpl<C, E, S>): TransitionResult {
-                return parent.execute(exec).takeIf { !it.success() }?.run {
+                return parent.execute(exec).takeIf { !it.isSuccess() }?.run {
                     try {
                         execution.invoke(exec)
                         TransitionResult.SUCCESS

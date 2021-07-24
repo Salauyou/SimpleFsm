@@ -4,7 +4,9 @@ package ru.salauyou.fsm
  * <p>Created on 2021-07-24
  * @author Aliaksandr Salauyou
  */
-class TransitionResult private constructor(val status: TransitionStatus, val msg: String?) {
+class TransitionResult private constructor(
+        private val status: TransitionStatus,
+        private val message: String?) {
 
     companion object {
         val SUCCESS = success()
@@ -13,9 +15,11 @@ class TransitionResult private constructor(val status: TransitionStatus, val msg
         fun error(msg: String? = null) = TransitionResult(TransitionStatus.TRANSITION_ERROR, msg)
     }
 
-    fun success() = status.success()
+    fun isSuccess() = status.isSuccess()
+    fun getStatus() = status
+    fun getMessage() = message
 
-    fun status() = status
+    override fun toString() = "$status${message?.let {": $it"} ?: "" }"
 }
 
 
@@ -30,5 +34,5 @@ enum class TransitionStatus(private val success: Boolean) {
     /** Failed due to uncaught exception */
     TRANSITION_ERROR(false);
 
-    fun success() = success
+    fun isSuccess() = success
 }

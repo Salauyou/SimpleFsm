@@ -9,11 +9,11 @@ interface Transition<C:Any, E:Any, S:Any> {
 }
 
 interface Execution<C:Any, E:Any, S:Any> {
-    fun consume(consumer: Consumer<in C, in E>)
+    fun consumer(consumer: Consumer<in C, in E>)
     fun filter(filter: Filter< in C, in E>)
     fun setState(state: S)
     fun <R:E> transform(transformer: Transformer<in C, in E, out R>)
-    fun <V> route(router: (E) -> V, executions: RouteExecution<C, E, S, V>.() -> Unit)
+    fun <V> router(router: (E) -> V, executions: RouteExecution<C, E, S, V>.() -> Unit)
 }
 
 interface RouteExecution<C:Any, E:Any, S:Any, V> {
