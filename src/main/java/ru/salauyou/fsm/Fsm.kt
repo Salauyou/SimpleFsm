@@ -4,47 +4,74 @@ package ru.salauyou.fsm
  * <p>Created on 2021-07-22
  * @author Aliaksandr Salauyou
  */
-interface Transition<C:Any, E:Any, S:Any> {
-    fun ifFailed(execution: Execution<C, E, S>.() -> Unit): Transition<C, E, S>
+
+/**
+ * Decides to continue or not execution by returning [TransitionResult].
+ * Execution will not continue if [TransitionResult.isSuccess] = [false]
+ */
+fun interface Filter<C:Any, E:Any> {
+    fun filter(context: C, event: E): TransitionResult
 }
 
-interface Execution<C:Any, E:Any, S:Any> {
-    fun consumer(consumer: Consumer<in C, in E>)
-    fun filter(filter: Filter< in C, in E>)
-    fun setState(state: S)
-    fun <R:E> transform(transformer: Transformer<in C, in E, out R>)
-    fun <V> router(router: (E) -> V, executions: RouteExecution<C, E, S, V>.() -> Unit)
-}
-
-interface RouteExecution<C:Any, E:Any, S:Any, V> {
-    fun whenever(vararg values: V, execution: Execution<C, E, S>.() -> Unit)
-    fun otherwise(execution: Execution<C, E, S>.() -> Unit)
-}
-
+/**
+ * Executes some action
+ */
 fun interface Consumer<C:Any, E:Any> {
     fun consume(context: C, event: E)
     fun consume(context: C, event: E, result: TransitionResult) = consume(context, event)
 }
 
+/**
+ * Transforms an event. Returned event will be used for further execution
+ */
 fun interface Transformer<C:Any, E:Any, R:E> {
     fun transform(context: C, event: E): R
 }
 
-fun interface Filter<C:Any, E:Any> {
-    fun filter(context: C, event: E): TransitionResult
-}
-
+/**
+ * SM configuration builder
+ *
+ * @param C context type
+ * @param E SM event type
+ * @param S state type
+ */
 interface FsmBuilder<C:Any, E:Any, S:Any> {
+
+    /**
+     * Defines a transition which should be done when SM being in
+     * [sourceState] receives [event] of type [T]. Upon successful
+     * execution SM switches into [targetState] unless it is [null]
+     */
     fun <T:E> transition(
         sourceState: S,
         event: Class<T>,
         targetState: S? = null,
-        transition: Execution<C, T, S>.() -> Unit)
+        execution: Execution<C, T, S>.() -> Unit)
     : Transition<C, T, S>
 
     fun build(): FsmInstance<C, E, S>
 }
 
+/**
+ * SM transition
+ *
+ * @param <C> context type
+ * @param <E> event type
+ * @param <S> state type
+ */
+interface Transition<C:Any, E:Any, S:Any> {
+
+    /**
+     * Adds execution block to run if prior execution failed.
+     * In this block [TransitionResult] is not modified and SM does not move
+     * into target state
+     */
+    fun ifFailed(execution: Execution<C, E, S>.() -> Unit): Transition<C, E, S>
+}
+
+/**
+ * SM instance built on SM configuration
+ */
 interface FsmInstance<C:Any, E:Any, S:Any> {
     fun init(context: C, state: S)
     fun invoke(event: E): TransitionResult

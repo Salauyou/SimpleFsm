@@ -15,14 +15,14 @@ class FsmBuilderImpl<C:Any, E:Any, S:Any> : FsmBuilder<C, E, S> {
             sourceState: S,
             event: Class<T>,
             targetState: S?,
-            transition: Execution<C, T, S>.() -> Unit)
+            execution: Execution<C, T, S>.() -> Unit)
         : Transition<C, T, S> {
 
         currentBuild = sourceState to event
         val ref = transitions.computeIfAbsent(currentBuild.second) {
             AtomicReference<TransitionImpl<C, E, S>>()
         } as AtomicReference<TransitionImpl<C, T, S>>
-        TransitionImpl(ref, sourceState, targetState, transition).let {
+        TransitionImpl(ref, sourceState, targetState, execution).let {
             ref.set(it)
             return it
         }
@@ -63,31 +63,31 @@ private class ExecutionImpl<C:Any, E:Any, S:Any>(
         manualState = state
     }
 
-    override fun <V> router(router: (E) -> V, executions: RouteExecution<C, E, S, V>.() -> Unit) {
-        RouteExecutionImpl(this, router.invoke(event)).let {
-            executions.invoke(it)
+    override fun <V> router(keyExtractor: (E) -> V, execution: RouteExecution<C, E, S, V>.() -> Unit) {
+        RouteExecutionImpl(this, keyExtractor.invoke(event)).let {
+            execution.invoke(it)
         }
     }
 }
 
-private class RouteExecutionImpl<C:Any, E:Any, S:Any, V>(
+private class RouteExecutionImpl<C:Any, E:Any, S:Any, K>(
         private val ctx: ExecutionImpl<C, E, S>,
-        private val evaluated: V)
-    : RouteExecution<C, E, S, V> {
+        private val key: K)
+    : RouteExecution<C, E, S, K> {
 
-    private var valueMet = false
+    private var keyMet = false
 
-    override fun whenever(vararg values: V, execution: Execution<C, E, S>.() -> Unit) {
-        if (evaluated in values) {
+    override fun whenever(vararg keys: K, execution: Execution<C, E, S>.() -> Unit) {
+        if (key in keys) {
             execution.invoke(ctx)
-            valueMet = true
+            keyMet = true
         }
     }
 
     override fun otherwise(execution: Execution<C, E, S>.() -> Unit) {
-        if (!valueMet) {
+        if (!keyMet) {
             execution.invoke(ctx)
-            valueMet = true
+            keyMet = true
         }
     }
 }
